@@ -60,6 +60,25 @@
     background: #fff;
     transition: width .45s cubic-bezier(.22,.9,.36,1);
   }
+  /* 本周统计（进度条） */
+  .week {
+    margin-top: 16px; padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,.28);
+  }
+  .week-title { font-size: 12.5px; font-weight: 700; letter-spacing: .5px; opacity: .95; }
+  .week-bar-row { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+  .week-bar-label { flex: none; width: 26px; font-size: 11.5px; color: rgba(255,255,255,.92); }
+  .week-bar { flex: 1; height: 8px; border-radius: 99px; background: rgba(255,255,255,.28); overflow: hidden; }
+  .week-bar-fill { height: 100%; width: 0; border-radius: 99px; background: #fff; transition: width .45s cubic-bezier(.22,.9,.36,1); }
+  .week-bar-num { flex: none; min-width: 46px; text-align: right; font-size: 11.5px; color: #fff; font-variant-numeric: tabular-nums; opacity: .95; }
+  .week-days { display: flex; margin-top: 12px; }
+  .wday { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .wdot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.65); box-sizing: border-box; }
+  .wlabel { font-size: 10.5px; color: rgba(255,255,255,.85); }
+  .wday.done .wdot { background: #fff; border-color: #fff; }
+  .wday.today .wdot { box-shadow: 0 0 0 2px rgba(255,255,255,.30); }
+  .wday.today .wlabel { font-weight: 800; color: #fff; }
+  .wday.future .wdot, .wday.future .wlabel { opacity: .35; }
 
   /* Habit list */
   .list { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
@@ -217,6 +236,20 @@
       </div>
       <p class="hint" id="doneHint">今天还没有完成，开始第一项吧 💪</p>
       <div class="bar"><div class="bar-fill" id="progressFill"></div></div>
+      <div class="week" id="weekBlock">
+        <div class="week-head"><span class="week-title">本周打卡</span></div>
+        <div class="week-bar-row">
+          <span class="week-bar-label">完成</span>
+          <div class="week-bar"><div class="week-bar-fill" id="weekDoneBar"></div></div>
+          <span class="week-bar-num" id="weekDoneNum">0/0</span>
+        </div>
+        <div class="week-bar-row">
+          <span class="week-bar-label">天数</span>
+          <div class="week-bar"><div class="week-bar-fill" id="weekDaysBar"></div></div>
+          <span class="week-bar-num" id="weekDaysNum">0/0</span>
+        </div>
+        <div class="week-days" id="weekDays"></div>
+      </div>
     </header>
 
     <section class="list" id="habitList"></section>
@@ -263,6 +296,12 @@
   var toastEl = document.getElementById('toast');
   var historySectionEl = document.getElementById('historySection');
   var historyGridEl = document.getElementById('historyGrid');
+  var weekDoneBarEl = document.getElementById('weekDoneBar');
+  var weekDoneNumEl = document.getElementById('weekDoneNum');
+  var weekDaysBarEl = document.getElementById('weekDaysBar');
+  var weekDaysNumEl = document.getElementById('weekDaysNum');
+  var weekDaysEl = document.getElementById('weekDays');
+  var weekDaysEl = document.getElementById('weekDays');
 
   var habits = loadHabits();
   var log = loadLog();
@@ -362,6 +401,7 @@
     } else {
       hintEl.textContent = '全部完成，太棒了！🎉';
     }
+    renderWeek();
   }
 
   function renderList() {
@@ -479,6 +519,61 @@
     historyGridEl.innerHTML = h;
   }
 
+  /* ---------- 本周统计 ---------- */
+
+  // 本周一 ~ 本周日（周一开始）
+  function weekDays() {
+    var now = new Date();
+    now.setHours(12, 0, 0, 0);
+    var dow = now.getDay(); // 0 = 周日
+    var diff = (dow === 0 ? -6 : 1 - dow);
+    var mon = new Date(now);
+    mon.setDate(now.getDate() + diff);
+    var labels = ['一', '二', '三', '四', '五', '六', '日'];
+    var arr = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      arr.push({ key: keyOf(d), label: labels[i] });
+    }
+    return arr;
+  }
+
+  function renderWeek() {
+    var days = weekDays();
+    var today = todayKey();
+    var total = 0, doneDays = 0, elapsed = 0;
+    days.forEach(function (d) {
+      if (d.key > today) return; // 未来日期不算
+      elapsed++;
+      var n = dayCount(d.key);
+      total += n;
+      if (n > 0) doneDays++;
+    });
+    // 完成进度 = 本周已完成项数 / (习惯数 × 已过天数)
+    var maxTotal = habits.length * elapsed;
+    weekDoneBarEl.style.width = (maxTotal ? Math.round(total / maxTotal * 100) : 0) + '%';
+    weekDoneNumEl.textContent = total + '/' + maxTotal;
+    // 天数进度 = 本周打过卡的天数 / 已过天数
+    weekDaysBarEl.style.width = (elapsed ? Math.round(doneDays / elapsed * 100) : 0) + '%';
+    weekDaysNumEl.textContent = doneDays + '/' + elapsed;
+
+    var html = '';
+    days.forEach(function (d) {
+      var cls = 'wday';
+      if (d.key === today) {
+        cls += ' today';
+        if (dayCount(d.key) > 0) cls += ' done';
+      } else if (d.key > today) {
+        cls += ' future';
+      } else if (dayCount(d.key) > 0) {
+        cls += ' done';
+      }
+      html += '<div class="' + cls + '"><span class="wdot"></span><span class="wlabel">' + d.label + '</span></div>';
+    });
+    weekDaysEl.innerHTML = html;
+  }
+
   /* ---------- actions ---------- */
 
   function setDoneUI(id, done) {
@@ -572,7 +667,7 @@
   renderList();
   renderHistory();
   // 页面如果跨过午夜还开着，自动刷新日期与记录
-  setInterval(function () { renderDate(); renderHistory(); }, 60000);
+  setInterval(function () { renderDate(); renderHistory(); renderWeek(); }, 60000);
 })();
 </script>
 <script>
