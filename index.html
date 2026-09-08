@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>苏晓萍习惯打卡</title>
+<meta name="theme-color" content="#ff7a59">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="习惯打卡">
+<style>
+  :root {
+    --card: #ffffff;
+    --ink: #3d2c22;
+    --muted: #a08a78;
+    --accent: #ff7a59;
+    --accent-soft: #ffe3d6;
+    --done: #3cb371;
+    --done-soft: #d9f2e3;
+    --line: #f0e2d4;
+    --shadow: 0 10px 30px rgba(160, 120, 80, .14);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: linear-gradient(160deg, #fff7ed, #ffe8d6);
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 60px;
+  }
+  .app { width: 100%; max-width: 460px; }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, #ff9a6c, #ff7a59);
+    border-radius: 24px;
+    padding: 22px 22px 18px;
+    color: #fff;
+    box-shadow: var(--shadow);
+  }
+  .date { margin: 0 0 4px; font-size: 13px; opacity: .85; letter-spacing: .5px; }
+  h1 { margin: 0 0 14px; font-size: 26px; font-weight: 800; }
+  .summary { display: flex; align-items: baseline; gap: 10px; }
+  .count { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .count .slash { opacity: .55; margin: 0 4px; font-size: 26px; }
+  .count .unit { font-size: 15px; opacity: .85; margin-left: 4px; font-weight: 600; }
+  .hint { margin: 6px 0 0; font-size: 13.5px; opacity: .92; }
+  .bar {
+    margin-top: 14px; height: 8px; border-radius: 99px;
+    background: rgba(255,255,255,.3); overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; width: 0; border-radius: 99px;
+    background: #fff;
+    transition: width .45s cubic-bezier(.22,.9,.36,1);
+  }
+
+  /* Habit list */
+  .list { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .habit-item {
+    display: flex; align-items: center;
+    background: var(--card); border-radius: 18px;
+    box-shadow: 0 6px 18px rgba(160,120,80,.10);
+    animation: pop .3s ease both;
+    transition: transform .15s ease, opacity .3s ease;
+  }
+  .habit-item:active { transform: scale(.985); }
+  .habit-item.removing { opacity: 0; transform: translateX(24px); }
+  .habit {
+    display: flex; align-items: center; flex: 1; gap: 14px;
+    padding: 16px 4px 16px 16px; cursor: pointer; min-width: 0;
+    position: relative;
+  }
+  .habit input { position: absolute; opacity: 0; pointer-events: none; }
+  .check {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid #e5c9b4; background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s ease;
+  }
+  .check svg { width: 14px; height: 14px; opacity: 0; transform: scale(.4); transition: all .2s ease; }
+  .habit.checked .check { background: var(--done); border-color: var(--done); }
+  .habit.checked .check svg { opacity: 1; transform: scale(1); }
+  .name {
+    font-size: 16px; font-weight: 600; line-height: 1.4;
+    word-break: break-word;
+    transition: color .2s ease;
+  }
+  .habit.checked .name { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(160,138,120,.6); }
+  .del {
+    flex: none; border: none; background: transparent; cursor: pointer;
+    width: 44px; height: 44px; font-size: 15px; color: #cbb7a6;
+    border-radius: 12px; transition: color .15s ease, background .15s ease;
+  }
+  .del:hover { color: #e05656; background: #fdeeee; }
+  .undo {
+    flex: none; border: none; background: transparent; cursor: pointer;
+    font-family: inherit; font-size: 12.5px; color: #b39a85;
+    height: 44px; padding: 0 10px 0 2px; border-radius: 10px;
+  }
+  .undo:active { color: var(--accent); }
+  .habit-item:not(.done) .undo { display: none; }
+  .habit-item.done .undo { display: inline-flex; align-items: center; }
+
+  /* Empty state */
+  .empty {
+    margin-top: 26px; text-align: center; color: var(--muted);
+    background: rgba(255,255,255,.6); border: 2px dashed #e8cfb8;
+    border-radius: 18px; padding: 34px 20px; font-size: 14.5px; line-height: 1.9;
+  }
+  .empty .big { font-size: 38px; }
+
+  /* Add form */
+  .add {
+    margin-top: 22px; display: flex; gap: 10px;
+    position: sticky; bottom: 12px;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--line); border-radius: 18px;
+    padding: 10px; box-shadow: var(--shadow);
+  }
+  .add input {
+    flex: 1; min-width: 0; border: none; outline: none;
+    font-size: 15px; font-family: inherit; color: var(--ink);
+    background: transparent; padding: 6px 8px;
+  }
+  .add input::placeholder { color: #c3ac98; }
+  .add button {
+    flex: none; border: none; cursor: pointer;
+    background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    padding: 10px 18px; border-radius: 12px;
+    transition: filter .15s ease, transform .1s ease;
+  }
+  .add button:hover { filter: brightness(1.06); }
+  .add button:active { transform: scale(.96); }
+
+  /* History: last 10 days */
+  .history { margin-top: 30px; }
+  .history h2 {
+    font-size: 17px; margin: 0 0 3px;
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .history .sub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+  .legend { font-size: 11.5px; color: var(--muted); font-weight: 400; display: inline-flex; align-items: center; gap: 6px; }
+  .legend .mark { margin-right: 1px; }
+  .hgrid-wrap {
+    background: rgba(255,255,255,.85);
+    border: 1px solid var(--line); border-radius: 18px;
+    box-shadow: 0 6px 18px rgba(160,120,80,.08);
+    overflow-x: auto; padding: 12px 6px;
+  }
+  .hgrid {
+    display: grid;
+    grid-template-columns: 84px repeat(10, minmax(22px, 1fr)) 44px;
+    min-width: 340px; width: 100%;
+    row-gap: 2px;
+  }
+  .hrow { display: contents; }
+  .hcell {
+    display: flex; align-items: center; justify-content: center;
+    padding: 5px 0; border-radius: 8px;
+    font-size: 10px; color: #b39a85;
+    font-variant-numeric: tabular-nums;
+  }
+  .hcell.hdate { flex-direction: column; gap: 1px; }
+  .hcell.hdate b { font-size: 10.5px; font-weight: 700; color: #8a6f5c; }
+  .hcell.hdate span { font-size: 9.5px; color: #b39a85; }
+  .hcell.nowcol { background: rgba(255,122,89,.10); }
+  .hcell.nowcol b { color: var(--accent); }
+  .hcell.hdate.nowcol span { color: var(--accent); }
+  .hname {
+    display: flex; align-items: center;
+    padding: 6px 8px; font-size: 12.5px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hhead .hname { font-weight: 700; color: #8a6f5c; font-size: 12px; }
+  .hsum {
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1px;
+    font-size: 10px; color: #b39a85;
+  }
+  .hsum b { font-size: 12px; color: var(--accent); }
+  .hrow.hbody .hsum b { color: var(--done); }
+  .mark { display: inline-block; width: 13px; height: 13px; border-radius: 50%; flex: none; }
+  .mark.on  { background: var(--done); }
+  .mark.off { border: 1.5px solid #e6d5c4; }
+  .legend .mark { width: 11px; height: 11px; vertical-align: -1px; }
+  .hfoot .hcell { font-size: 10.5px; font-weight: 700; color: #8a6f5c; }
+  .hfoot .hcell.nowcol { color: var(--accent); }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translate(-50%, 20px);
+    background: rgba(61,44,34,.92); color: #fff;
+    padding: 10px 18px; border-radius: 99px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: all .3s ease; z-index: 10;
+    max-width: 80vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <p class="date" id="dateText"></p>
+      <h1>苏晓萍习惯打卡</h1>
+      <div class="summary">
+        <div class="count"><span id="doneCount">0</span><span class="slash">/</span><span id="totalCount">0</span><span class="unit">项</span></div>
+      </div>
+      <p class="hint" id="doneHint">今天还没有完成，开始第一项吧 💪</p>
+      <div class="bar"><div class="bar-fill" id="progressFill"></div></div>
+    </header>
+
+    <section class="list" id="habitList"></section>
+
+    <div class="empty" id="emptyState" hidden>
+      <div class="big">🌱</div>
+      <div>还没有习惯。<br>在下面输入第一个想坚持的习惯吧！</div>
+    </div>
+
+    <form class="add" id="addForm" autocomplete="off">
+      <input id="newHabit" type="text" maxlength="30" placeholder="添加习惯，如：读书 10 分钟">
+      <button type="submit">添加</button>
+    </form>
+
+    <section class="history" id="historySection" hidden>
+      <h2>📅 最近 10 天记录
+        <span class="legend"><span class="mark on"></span>已完成 <span class="mark off"></span>未完成</span>
+      </h2>
+      <p class="sub">含今天，从左到右按日期排列；打钩数据每天自动保留。</p>
+      <div class="hgrid-wrap">
+        <div class="hgrid" id="historyGrid"></div>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var HABITS_KEY = 'daily-habit.habits.v1';
+  var LOG_KEY    = 'daily-habit.log.v1';
+  var DEFAULT_HABITS = ['读书 10 分钟', '10 点前睡觉', '三餐按时吃饭'];
+
+  var listEl = document.getElementById('habitList');
+  var emptyEl = document.getElementById('emptyState');
+  var addForm = document.getElementById('addForm');
+  var inputEl = document.getElementById('newHabit');
+  var dateEl = document.getElementById('dateText');
+  var doneCountEl = document.getElementById('doneCount');
+  var totalCountEl = document.getElementById('totalCount');
+  var hintEl = document.getElementById('doneHint');
+  var fillEl = document.getElementById('progressFill');
+  var toastEl = document.getElementById('toast');
+  var historySectionEl = document.getElementById('historySection');
+  var historyGridEl = document.getElementById('historyGrid');
+
+  var habits = loadHabits();
+  var log = loadLog();
+  var toastTimer = null;
+
+  /* ---------- storage helpers ---------- */
+
+  function load(key, fallback) {
+    try {
+      var v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function save(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+  function loadHabits() {
+    var raw = localStorage.getItem(HABITS_KEY);
+    if (raw === null) {
+      // 第一次打开：预置几个示例习惯，方便直接开始
+      var seed = DEFAULT_HABITS.map(function (n, i) { return { id: uid(), name: n, createdAt: Date.now() + i }; });
+      save(HABITS_KEY, seed);
+      save(LOG_KEY, {});
+      return seed;
+    }
+    var arr = load(HABITS_KEY, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function loadLog() {
+    var obj = load(LOG_KEY, {});
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  }
+  function uid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+
+  /* ---------- date helpers ---------- */
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function keyOf(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function todayKey() { return keyOf(new Date()); }
+
+  // 最近 n 天（含今天），从旧到新
+  function lastDays(n) {
+    var out = [];
+    var now = new Date();
+    now.setHours(12, 0, 0, 0); // 中午，避免夏令时跨天偏差
+    for (var i = n - 1; i >= 0; i--) {
+      var d = new Date(now);
+      d.setDate(now.getDate() - i);
+      out.push({
+        key: keyOf(d),
+        md: (d.getMonth() + 1) + '/' + d.getDate(),
+        week: '周' + ['日', '一', '二', '三', '四', '五', '六'][d.getDay()],
+        isToday: i === 0
+      });
+    }
+    return out;
+  }
+
+  function renderDate() {
+    var d = new Date();
+    var week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+    dateEl.textContent = d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 · 星期' + week;
+  }
+
+  /* ---------- rendering ---------- */
+
+  function dayDone(day, habitId) { var o = day || {}; return !!o[habitId]; }
+  function todayDone() {
+    var day = log[todayKey()] || {};
+    var n = 0;
+    habits.forEach(function (h) { if (dayDone(day, h.id)) n++; });
+    return n;
+  }
+  function dayCount(dateKey) {
+    var day = log[dateKey] || {};
+    var n = 0;
+    habits.forEach(function (h) { if (dayDone(day, h.id)) n++; });
+    return n;
+  }
+
+  function render() {
+    var done = todayDone();
+    var total = habits.length;
+
+    doneCountEl.textContent = done;
+    totalCountEl.textContent = total;
+    fillEl.style.width = total ? (done / total * 100) + '%' : '0%';
+
+    if (!total) {
+      hintEl.textContent = '先添加一个想坚持的习惯吧 🌱';
+    } else if (done === 0) {
+      hintEl.textContent = '今天还没有完成，开始第一项吧 💪';
+    } else if (done < total) {
+      hintEl.textContent = '已完成 ' + done + ' 项，继续加油！';
+    } else {
+      hintEl.textContent = '全部完成，太棒了！🎉';
+    }
+  }
+
+  function renderList() {
+    listEl.innerHTML = '';
+    habits.forEach(function (h) { listEl.appendChild(buildItem(h)); });
+    emptyEl.hidden = habits.length > 0;
+    render();
+  }
+
+  function buildItem(h) {
+    var day = log[todayKey()] || {};
+    var checked = !!day[h.id];
+
+    var item = document.createElement('div');
+    item.className = 'habit-item' + (checked ? ' done' : '');
+    item.dataset.id = h.id;
+
+    var label = document.createElement('label');
+    label.className = 'habit' + (checked ? ' checked' : '');
+
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = checked;
+    cb.setAttribute('aria-label', (checked ? '已完成：' : '完成：') + h.name);
+    label.appendChild(cb);
+
+    var check = document.createElement('span');
+    check.className = 'check';
+    check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
+    label.appendChild(check);
+
+    var name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = h.name;
+    label.appendChild(name);
+
+    var del = document.createElement('button');
+    del.className = 'del';
+    del.type = 'button';
+    del.title = '删除习惯';
+    del.setAttribute('aria-label', '删除习惯：' + h.name);
+    del.textContent = '✕';
+
+    var undo = document.createElement('button');
+    undo.className = 'undo';
+    undo.type = 'button';
+    undo.textContent = '撤销';
+    undo.title = '撤销今天的勾选';
+    undo.setAttribute('aria-label', '撤销今天完成：' + h.name);
+    undo.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      undoToday(h.id, h.name);
+    });
+
+    // 点一下 = 完成打钩；已完成不会再被点掉（要改回请用“撤销”）
+    cb.addEventListener('change', function () { finishToday(h.id, h.name); });
+    del.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      removeHabit(h.id, h.name);
+    });
+
+    item.appendChild(label);
+    item.appendChild(undo);
+    item.appendChild(del);
+    return item;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // 最近 10 天记录表：习惯 × 日期
+  function renderHistory() {
+    historySectionEl.hidden = habits.length === 0;
+    if (!habits.length) return;
+
+    var days = lastDays(10);
+    var today = todayKey();
+    var h = '';
+
+    // 表头
+    h += '<div class="hrow hhead">';
+    h += '<div class="hname">习惯</div>';
+    days.forEach(function (d) {
+      h += '<div class="hcell hdate' + (d.key === today ? ' nowcol' : '') + '"><b>' + d.md + '</b><span>' + (d.isToday ? '今天' : d.week) + '</span></div>';
+    });
+    h += '<div class="hsum"><b>达标</b><span>天数</span></div>';
+    h += '</div>';
+
+    // 每个习惯一行
+    habits.forEach(function (hab) {
+      h += '<div class="hrow hbody">';
+      h += '<div class="hname" title="' + escapeHtml(hab.name) + '">' + escapeHtml(hab.name) + '</div>';
+      var cnt = 0;
+      days.forEach(function (d) {
+        var done = dayDone(log[d.key], hab.id);
+        if (done) cnt++;
+        h += '<div class="hcell' + (d.key === today ? ' nowcol' : '') + '"><span class="mark ' + (done ? 'on' : 'off') + '"></span></div>';
+      });
+      h += '<div class="hsum"><b>' + cnt + '</b>/10</div>';
+      h += '</div>';
+    });
+
+    // 底部：每天完成几项
+    h += '<div class="hrow hfoot">';
+    h += '<div class="hname">当日完成</div>';
+    days.forEach(function (d) {
+      h += '<div class="hcell' + (d.key === today ? ' nowcol' : '') + '">' + dayCount(d.key) + '/' + habits.length + '</div>';
+    });
+    h += '<div class="hsum"></div>';
+    h += '</div>';
+
+    historyGridEl.innerHTML = h;
+  }
+
+  /* ---------- actions ---------- */
+
+  function setDoneUI(id, done) {
+    var item = listEl.querySelector('.habit-item[data-id="' + CSS.escape(id) + '"]');
+    if (!item) return;
+    var label = item.querySelector('.habit');
+    var cb = item.querySelector('input');
+    var nm = label.querySelector('.name').textContent;
+    label.classList.toggle('checked', done);
+    item.classList.toggle('done', done);
+    cb.checked = done;
+    cb.setAttribute('aria-label', (done ? '已完成：' : '完成：') + nm);
+  }
+
+  // 点一下 = 完成并打钩；已完成的行再点也不会取消
+  function finishToday(id, name) {
+    var today = todayKey();
+    var wasDone = !!(log[today] || {})[id];
+    if (!log[today]) log[today] = {};
+    log[today][id] = true;
+    save(LOG_KEY, log);
+
+    setDoneUI(id, true);
+    render();
+    renderHistory();
+
+    if (wasDone) {
+      showToast('今天已完成啦，再点不会取消哦 ✓');
+    } else if (habits.length && todayDone() === habits.length) {
+      showToast('全部完成，太棒了！🎉');
+    }
+  }
+
+  // 只有点“撤销”才取消今天的勾选
+  function undoToday(id, name) {
+    var today = todayKey();
+    if (log[today] && log[today][id]) {
+      delete log[today][id];
+      save(LOG_KEY, log);
+    }
+    setDoneUI(id, false);
+    render();
+    renderHistory();
+    showToast('已撤销「' + name + '」今天的勾选');
+  }
+
+  function addHabit(name) {
+    habits.push({ id: uid(), name: name, createdAt: Date.now() });
+    save(HABITS_KEY, habits);
+    renderList();
+    renderHistory();
+    showToast('已添加「' + name + '」');
+  }
+
+  function removeHabit(id, name) {
+    if (!window.confirm('删除习惯「' + name + '」？')) return;
+    habits = habits.filter(function (h) { return h.id !== id; });
+    save(HABITS_KEY, habits);
+    renderList();
+    renderHistory();
+    showToast('已删除「' + name + '」');
+  }
+
+  /* ---------- toast ---------- */
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+  }
+
+  /* ---------- events ---------- */
+
+  addForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var name = inputEl.value.trim();
+    if (!name) return;
+    if (habits.some(function (h) { return h.name === name; })) {
+      showToast('这个习惯已经添加过啦');
+      return;
+    }
+    addHabit(name);
+    inputEl.value = '';
+    inputEl.focus();
+  });
+
+  /* ---------- init ---------- */
+
+  renderDate();
+  renderList();
+  renderHistory();
+  // 页面如果跨过午夜还开着，自动刷新日期与记录
+  setInterval(function () { renderDate(); renderHistory(); }, 60000);
+})();
+</script>
+<script>
+  // 仅在 https / localhost 下注册（本地直接打开文件时自动跳过，不影响使用）
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>
