@@ -1,5 +1,5 @@
 /* 苏晓萍习惯打卡 - Service Worker：让网页安装成 App 后可以离线使用 */
-var CACHE = 'sxp-checkin-v1';
+var CACHE = 'sxp-checkin-v2';
 var ASSETS = [
   './',
   './index.html',
